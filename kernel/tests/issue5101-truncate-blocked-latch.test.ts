@@ -157,9 +157,13 @@ test("#5101: clean old BLOCKED entries while retaining a valid unique-ref clip",
     renderTags: "none",
   });
   const ref = initial.state.messageRefs.byRaw["ordinary-large"]!;
+  const validClip =
+    longResult.slice(0, 64) +
+    "\n\n...[truncated for context space] — original ~5000 tokens]...\n\n" +
+    longResult.slice(-64);
   assert.notEqual(ref, BLOCKED_REF);
   initial.state.emergencyTruncateLatch = [
-    { ref, text: "valid unique clip" },
+    { ref, text: validClip },
     { ref: BLOCKED_REF, text: "wrong shared clip" },
   ];
   const turn = core.processTurn({
@@ -171,10 +175,10 @@ test("#5101: clean old BLOCKED entries while retaining a valid unique-ref clip",
   });
   assert.equal(
     turn.messages.find((m) => m.id === "ordinary-large")!.text,
-    "valid unique clip",
+    validClip,
   );
   assert.equal(turn.messages.find((m) => m.id === "call2")!.text, originalArgs);
   assert.deepEqual(turn.state.emergencyTruncateLatch, [
-    { ref, text: "valid unique clip" },
+    { ref, text: validClip },
   ]);
 });

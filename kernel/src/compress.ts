@@ -12,7 +12,7 @@ import {
   parseBoundary,
 } from "./boundaries.js";
 import type { ResolvedRange } from "./boundaries.js";
-import { truncateLargeToolOutputs } from "./truncate-tools.js";
+import { isClipOf, truncateLargeToolOutputs } from "./truncate-tools.js";
 import { scrubLoneSurrogates } from "./truncate.js";
 import { hideConsumedCompressCalls, refNum } from "./hide-consumed.js";
 import { appendAbsorbPrompts, hideAbsorbedMessages } from "./absorb.js";
@@ -1594,9 +1594,11 @@ const emergencyTruncateNode: PipelineNode = {
     // #3939 ③/#3691: replay latched clips BEFORE the watermark check. The
     // decision to clip was made once at the watermark; re-evaluating it every
     // turn against a fluctuating estimate flips the same bytes full↔clipped —
-    // a mid-history rewrite on every request (prefix-cache breaker). Refs are
-    // content-bound, so an edited message misses its entry and re-judges from
-    // scratch; entries whose messages left the view retire; the whole latch
+    // a mid-history rewrite on every request (prefix-cache breaker). A clip
+    // replays only onto the text it was cut from — the ref alone does not
+    // prove that (a config edit re-renders the message, a host ref restamp
+    // re-binds the ref, #5534) — so a mismatch re-judges from scratch;
+    // entries whose messages left the view retire; the whole latch
     // resets on the next successful fold (applyCompression).
     const storedLatch = io.state.emergencyTruncateLatch ?? [];
     // BLOCKED is shared by protected messages, not a message identity (#5101).
@@ -1616,6 +1618,7 @@ const emergencyTruncateNode: PipelineNode = {
         const clipped =
           ref !== undefined && ref !== BLOCKED_REF ? byRef.get(ref) : undefined;
         if (clipped === undefined || clipped === m.text) return m;
+        if (!isClipOf(m.text ?? "", clipped)) return m;
         replaySaved += Math.max(
           0,
           ctx.countTokens(m.text ?? "") - ctx.countTokens(clipped),

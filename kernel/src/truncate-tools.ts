@@ -28,6 +28,19 @@ export interface TruncateResult {
 
 const TRUNCATION_MARKER = "[truncated for context space]";
 
+/** True iff `clipped` is a clip of `original` as cut below: prefix(original)
+ *  + marker + suffix(original), strictly shorter. */
+export function isClipOf(original: string, clipped: string): boolean {
+  const head = clipped.indexOf(`\n\n...${TRUNCATION_MARKER}`);
+  if (head < 0 || clipped.length >= original.length) return false;
+  const tail = clipped.indexOf("]...\n\n", head + 5 + TRUNCATION_MARKER.length);
+  if (tail < 0) return false;
+  return (
+    original.startsWith(clipped.slice(0, head)) &&
+    original.endsWith(clipped.slice(tail + 6))
+  );
+}
+
 const DEFAULTS: Required<Omit<TruncateOptions, "includeTextMessages">> = {
   minOutputTokens: 1000,
   keepPrefixChars: 2000,
